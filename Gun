@@ -1,0 +1,196 @@
+using System.Collections;
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.PlayerLoop;
+using UnityEngine.UIElements;
+
+public class Gun : MonoBehaviour
+{
+    Vector3 movement;
+    Rigidbody rb;
+    public float moveSpeed;
+
+    public Color yellow = Color.yellow;
+    public Color white = Color.white;
+    public Color red = Color.red;
+
+    Ray shootRay = new Ray();
+    
+    public GameObject gunZone;
+    public float zoneSpeed;
+    public float gunZoneTimer;
+    public bool aiming;
+    public bool aimSwitch = true;
+    public float aimRadius = 90f;
+    public int shootingLayer;
+    public int blockingLayer;
+    public int bullets = 6;
+
+    public bool timeFreezed = false;
+
+    Vector3 begin;
+    Vector3 end;
+    LineRenderer aimingLine;
+    public TrailRenderer trail;
+
+    AudioSource playerAudio;
+    public AudioClip gunShot;
+    public AudioClip reload;
+
+    int aimingOrigin = 0;
+    // Start is called before the first frame update
+    void Start()
+    {
+        playerAudio = GetComponent<AudioSource>();
+        rb = GetComponent<Rigidbody>();
+        begin = gunZone.transform.eulerAngles;
+        end = new Vector3(gunZone.transform.eulerAngles.x, gunZone.transform.eulerAngles.y + 
+            aimRadius, gunZone.transform.eulerAngles.z);
+        aimingLine = GetComponentInChildren<LineRenderer>();
+        aimingLine.enabled = false;
+        trail.enabled = false;
+        shootingLayer = LayerMask.GetMask("KillLayer");
+        blockingLayer = LayerMask.GetMask("BlockingObject");
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+
+        gunZoneTimer += Time.deltaTime;
+
+        if(Input.GetButtonDown("rightShoulder") && !aiming && bullets > 0)
+        {
+            aimingLine.enabled = true;
+            trail.enabled = true;
+            gunZoneTimer = 0;
+            aiming = true;         
+        }
+        else if (Input.GetButtonDown("rightShoulder") && aiming && bullets > 0)
+        {
+            shootRay.origin = gunZone.transform.position;
+            shootRay.direction = gunZone.transform.forward;
+            aimingLine.startColor = yellow;
+            aimingLine.endColor = yellow;
+            RaycastHit shootHit;
+            bullets -= 1;
+            Ammo();
+            playerAudio.PlayOneShot(gunShot);
+
+            if (Physics.Raycast(shootRay, out shootHit, aimingLine.bounds.size.magnitude, blockingLayer) && shootHit.collider.GetComponent<Blocks>() != null)
+            {
+                shootHit.collider.GetComponent<Blocks>().CoverDestruct();
+            }
+            else if (Physics.Raycast(shootRay, out shootHit, aimingLine.bounds.size.magnitude, shootingLayer))
+            {
+                Debug.Log("HIT");
+                shootHit.collider.GetComponent<Enemy>().Death();
+            }
+        }
+
+        if(Input.GetButtonUp("rightShoulder"))
+        {
+            aimingLine.startColor = white;
+            aimingLine.endColor = white;
+        }
+
+        if (aiming)
+        {
+            gunZone.transform.eulerAngles = new Vector3(gunZone.transform.rotation.x,
+                Mathf.Lerp(begin.y+aimingOrigin, end.y+aimingOrigin, gunZoneTimer * zoneSpeed),
+                    gunZone.transform.rotation.z);
+        }
+        if(gunZoneTimer> 1/zoneSpeed)
+        { 
+            aiming = false;
+            aimingLine.enabled = false;
+            trail.enabled = false;
+        }
+
+        if(Input.GetButtonDown("leftStickClick") && !aiming)
+        {
+            AimSwitch();
+        }
+
+
+        if (Input.GetButtonDown("aButton") && !timeFreezed)
+        {
+            timeFreezed = true;
+            zoneSpeed += .5f;
+            Time.timeScale = .5f;
+        }
+        else if (timeFreezed && Input.GetButtonDown("aButton"))
+        {
+            zoneSpeed -= .5f;
+            Time.timeScale = 1f;
+            timeFreezed = false;
+        }
+    }
+
+    void FixedUpdate()
+    {
+        if (!Input.GetButton("aButton"))
+        {
+            float h = Input.GetAxisRaw("Horizontal");
+            float v = Input.GetAxisRaw("Vertical");
+
+            Move(h, v);
+
+        }
+
+        if (!Input.GetButton("aButton"))
+        {
+            float rh = Input.GetAxisRaw("rightStick H");
+            float rv = Input.GetAxisRaw("rightStick V");
+
+
+            Vector3 lookDirection = new Vector3(rh, 0, rv);
+
+            transform.rotation = Quaternion.LookRotation(lookDirection);
+
+            gunZone.transform.rotation = Quaternion.LookRotation(lookDirection);
+
+            Debug.Log(lookDirection);
+        }
+    }
+
+    void Move(float h, float v)
+    {
+        movement.Set(h, 0f, v);
+
+        rb.MovePosition(transform.position + movement * moveSpeed);
+    }
+
+
+    void AimSwitch()
+    {
+        begin.y = begin.y * -1;
+        end.y = end.y * -1;
+    }
+
+    public GameObject chamber;
+    public List<GameObject> rounds;
+
+    void Ammo()
+    {
+        Debug.Log("CHAMBER ROTATED");
+
+        for (int i = 0; i < rounds.Count; i++)
+        {
+            rounds[0+(-1*(bullets-5))].SetActive(false);
+        }
+
+        chamber.transform.Rotate(transform.rotation.x, transform.rotation.y, transform.rotation.z + 60);
+    }
+
+    public void Reload()
+    {
+        playerAudio.PlayOneShot(reload);
+        foreach (GameObject bullets in rounds)
+        {
+            bullets.SetActive(true);
+        }
+        bullets = 6;
+    }
+}
