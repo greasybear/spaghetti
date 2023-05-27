@@ -1,0 +1,47 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class Ammo : MonoBehaviour
+{
+    public bool SliderOn = false;
+    Gun gun;
+    public Slider ammoSlider;
+    public float ammoTimer;
+    // Start is called before the first frame update
+    void Start()
+    {
+        ammoSlider = GetComponent<Slider>();
+        gun = GetComponentInParent<Gun>();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+
+        ammoTimer += Time.deltaTime;
+
+        if (Input.GetKeyDown(KeyCode.R) || Input.GetButtonDown("leftShoulder"))
+        {
+            SliderOn = true;
+            ammoTimer = 0;
+        }
+
+        if(SliderOn)
+        {
+            ammoSlider.value += Time.deltaTime;
+
+            if(Input.GetKeyDown(KeyCode.R) || Input.GetButtonDown("leftShoulder") && ammoSlider.value > .4f && ammoSlider.value < .6f)
+            {
+                gun.Reload();
+            }
+        }
+
+        if (ammoSlider.value >= 1 && SliderOn && ammoTimer > 2f)
+        {
+            SliderOn = false;
+            ammoSlider.value = 0;
+        }
+    }
+}
