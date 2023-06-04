@@ -1,0 +1,59 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
+
+public class AmmoController : MonoBehaviour
+{
+    public bool SliderOn = false;
+    PlayerShooting playerShooting;
+    public Slider ammoSlider;
+    public float ammoTimer;
+    public GameObject Player;
+    public Image sliderColor;
+    public Image fillArea;
+    // Start is called before the first frame update
+    void Start()
+    {
+        ammoSlider = GetComponent<Slider>();
+        playerShooting = Player.GetComponentInParent<PlayerShooting>();
+    }
+    // Update is called once per frame
+    void Update()
+    {
+
+        ammoTimer += Time.deltaTime;
+
+        if (Input.GetButtonDown("Left Bumper"))
+        {
+            SliderOn = true;
+            ammoTimer = 0;
+        }
+
+        if (SliderOn)
+        {
+            ammoSlider.value += Time.deltaTime;
+
+            if (Input.GetButtonDown("Left Bumper") && ammoSlider.value > .4f && ammoSlider.value < .6f)
+            {
+                playerShooting.Reload();
+            }
+            if (Input.GetButtonDown("Left Bumper") && ammoSlider.value > .1f &&  ammoSlider.value < .4f || Input.GetButtonDown("Left Bumper") && ammoSlider.value > .6f )
+            {
+                Debug.Log("BAD RELOAD");
+                fillArea.color = Color.red;
+                sliderColor.color = Color.red;
+
+            }
+        }
+
+        if (ammoSlider.value >= 1 && SliderOn && ammoTimer > 2f)
+        {
+            SliderOn = false;
+            ammoSlider.value = 0;
+            sliderColor.color = Color.white;
+            fillArea.color = Color.white;
+        }
+    }
+}
