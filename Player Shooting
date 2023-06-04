@@ -1,0 +1,178 @@
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine.InputSystem;
+using UnityEngine;
+
+public class PlayerShooting : Shooting
+{ //NEED TO WRITE A 360 DEGREE FAN MODE - EDIT THE AIMRADIUS
+    public int shootingLayer;
+    public int blockingLayer;
+    Ray shootRay = new Ray();
+    public GameObject gunZone;
+    public LineRenderer aimingLine;
+
+    Vector3 begin;
+    Vector3 end;
+    public float aimRadius = 90f;
+    float gunZoneTimer;
+    public float zoneSpeed;
+    public bool aiming;
+    public TrailRenderer trail;
+    public int destroyLayer;
+
+    public int bullets;
+    public GameObject chamber;
+    public List<GameObject> rounds;
+    public bool frozen = false;
+
+    protected override void Start()
+    {
+        base.Start();
+        aimingLine = gunZone.GetComponent<LineRenderer>();
+        aimingLine.enabled = false;
+        destroyLayer = LayerMask.GetMask("Destroy");
+        
+    }
+    private void FixedUpdate()
+    {
+        if(!frozen)
+        {
+            var gamepad = Gamepad.current;
+            if (gamepad == null)
+                return;
+            if(gamepad.rightTrigger.wasPressedThisFrame)
+            {
+                Debug.Log("HE'S SHOOTING!!!");
+            }
+        }
+    }
+    // Update is called onue per frame
+    void Update()
+    {
+        if (!frozen)
+        {
+            var gamepad = Gamepad.current;
+            if (gamepad == null)
+                return;
+
+            if (gamepad.rightTrigger.wasPressedThisFrame && !firing && bullets > 0)//(Input.GetAxis("Fire1") != 0  && !firing && bullets > 0)
+            {
+                firing = true;
+                Shoot();
+                bullets -= 1;
+                Ammo(1);
+            }
+            if (Input.GetAxis("Fire1") == 0)
+            {
+                firing = false;
+            }
+
+            if (Input.GetButtonDown("Fire2") && bullets >=3)
+            {
+                shotgunLine.enabled = true;
+                shotgunLine.startColor = Color.yellow;
+                shotgunLine.endColor = Color.red;
+                Debug.Log("RIGHT BUMPER");
+                Shotgun();
+                bullets -= 3;
+                Ammo(3);
+                //THIS NEEDS FIXING!!   
+            }
+            if (Input.GetButtonUp("Fire2") || shotGunTimer > 1f)
+            {
+                shotgunLine.enabled = false;
+                shotGunTimer = 0;
+            }
+            if (Input.GetButton("Fire2"))
+            {
+                shotGunTimer += Time.deltaTime;
+            }
+            if (shotGunTimer > .2f)
+            {
+                shotgunLine.enabled = false;
+            }
+        }
+
+            gunZoneTimer += Time.deltaTime;
+
+            if (Input.GetButtonDown("Y Button") && !aiming && bullets > 0)
+            {
+                
+                aimingLine.enabled = true;
+                
+                trail.enabled = true;
+                gunZoneTimer = 0;
+                aiming = true;
+                begin = new Vector3(gunZone.transform.eulerAngles.x, gunZone.transform.eulerAngles.y, gunZone.transform.eulerAngles.z);
+                end = new(gunZone.transform.eulerAngles.x, gunZone.transform.eulerAngles.y + aimRadius, gunZone.transform.eulerAngles.z);
+                frozen = true;
+            }
+        
+
+        else if (Input.GetButtonDown("Y Button")  && aiming && bullets > 0)
+        {
+            shootRay.origin = gunZone.transform.position;
+            shootRay.direction = gunZone.transform.forward;
+            aimingLine.startColor = Color.yellow;
+            aimingLine.endColor = Color.yellow;
+            RaycastHit shootHit;
+            bullets -= 1;
+            Ammo(1);
+            //playerAudio.PlayOneShot(gunShot); AUDIO GOES HERE
+
+            if (Physics.Raycast(shootRay, out shootHit, aimingLine.bounds.size.magnitude, destroyLayer))
+            {
+                Debug.Log("RAYCAST HIT");
+                Destroy(shootHit.collider.gameObject);
+            }
+        }
+        else if (Input.GetButtonUp("Y Button") && aiming && bullets > 0)
+        {
+            aimingLine.startColor = Color.red;
+            aimingLine.endColor = Color.red;
+        }
+        if (aiming)
+        {
+            gunZone.transform.eulerAngles = new Vector3(gunZone.transform.rotation.x,
+                Mathf.Lerp(begin.y, end.y, gunZoneTimer * zoneSpeed),
+                    gunZone.transform.rotation.z);
+        }
+        if (gunZoneTimer > 1 / zoneSpeed && frozen)
+        {
+            aiming = false;
+            aimingLine.enabled = false;
+            trail.enabled = false;
+            gunZone.transform.eulerAngles = new Vector3(gunZone.transform.eulerAngles.x, gameObject.transform.eulerAngles.y -
+            (aimRadius/2), gunZone.transform.eulerAngles.z);
+            frozen = false;
+        }
+    }
+
+    int bulletsDisabled = 0;
+
+    void Ammo(int bulletRemove)
+    {
+        int endIndex = bulletsDisabled + bulletRemove;
+
+        for (int i = bulletsDisabled; i < endIndex && i < rounds.Count; i++)
+        {
+            rounds[i].SetActive(false);
+        }
+
+        bulletsDisabled += bulletRemove;
+        chamber.transform.Rotate(transform.rotation.x, transform.rotation.y, transform.rotation.z + 60);
+    }
+
+    public void Reload()
+    {
+        //playerAudio.PlayOneShot(reload);
+        foreach (GameObject bullets in rounds)
+        {
+            bullets.SetActive(true);
+        }
+        bulletsDisabled = 0;
+        bullets = 6;
+    }
+
+}
