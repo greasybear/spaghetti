@@ -1,0 +1,140 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.SceneManagement;
+using UnityEngine;
+
+public class PlayerMovement : MonoBehaviour
+{
+    public float moveSpeed = 5f;  // Player movement speed
+    public float rotationSpeed = 800f;
+    private Rigidbody rb;
+    private Vector3 movement;
+    public float dashForce = 10f; // The force applied during the dash
+    public float dashDuration = 0.5f; // The duration of the dash in seconds
+    public bool isDashing = false; // Flag to check if the player is currently dashing
+    private bool isLeftTriggerDown = false; // flag to check if left trigger is down
+    public Vector3 playerDirection;
+    public float dashTimer;
+    private Vector3 rotationInput;
+    public GameObject shield;
+    bool shieldStillHere = true;
+    PlayerShooting playerShooting;
+    private bool isPaused = false;
+    public GameObject pauseMenu;
+    public GameObject[] objectsToDestroy;  // List of GameObjects to be destroyed
+    public string nextLevelName;           // Name of the next level to load
+    void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        playerShooting = GetComponent<PlayerShooting>();
+    }
+    private bool AreObjectsDestroyed()
+    {
+        // Check if any object in the list is still active
+        foreach (GameObject obj in objectsToDestroy)
+        {
+            if (obj != null && obj.activeSelf)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void Update()
+    {
+            if (Input.GetButtonDown("Cancel"))
+            {
+                if (isPaused)
+                {
+                    pauseMenu.SetActive(false);
+                    Resume();
+                }
+                else
+                {
+                    pauseMenu.SetActive(true);
+                    Pause();
+                }
+            }
+
+        if (AreObjectsDestroyed())
+        {
+            // Load the next level
+            SceneManager.LoadScene(nextLevelName);
+        }
+
+        if (!playerShooting.frozen)
+        {
+            // Keyboard input
+            movement.x = Input.GetAxisRaw("Horizontal");
+            movement.z = Input.GetAxisRaw("Vertical");
+
+            // Xbox controller input
+            movement.x += Input.GetAxisRaw("Horizontal");
+            movement.z += Input.GetAxisRaw("Vertical");
+
+            rotationInput.x = Input.GetAxisRaw("HorizontalRightStick");
+            rotationInput.z = Input.GetAxisRaw("VerticalRightStick");
+
+            //dash input
+            if (Input.GetAxis("LeftTrigger") > 0 && !isLeftTriggerDown && dashTimer > 1f)
+            {
+                Dash();
+                Debug.Log("DASH IS HITTING");
+            }
+
+            dashTimer += Time.deltaTime;
+
+            playerDirection = movement.normalized;
+
+            if (Input.GetButtonDown("A Button") && shieldStillHere)
+            {
+                shield.SetActive(true);
+                shieldStillHere = false;
+                shield.transform.SetParent(null);
+            }
+        }
+    }
+
+    private void Pause()
+    {
+        Time.timeScale = 0f; // Set time scale to 0 to pause the game
+        isPaused = true;
+        // Additional code to show pause menu, freeze player movement, etc.
+    }
+
+    private void Resume()
+    {
+        Time.timeScale = 1f; // Set time scale back to 1 to resume the game
+        isPaused = false;
+        // Additional code to hide pause menu, resume player movement, etc.
+    }
+    void FixedUpdate()
+    {
+        if (!playerShooting.frozen)
+        {
+            // Move the player using the calculated movement vector
+            rb.MovePosition(rb.position + movement.normalized * moveSpeed * Time.fixedDeltaTime);
+            //Rotate the player using the right stick
+            if (rotationInput != Vector3.zero)
+            {
+                float targetAngle = Mathf.Atan2(rotationInput.x, rotationInput.z) * Mathf.Rad2Deg;
+                Quaternion targetRotation = Quaternion.Euler(0, targetAngle, 0);
+                transform.rotation = targetRotation;
+            }
+        }
+    }
+
+    private void Dash()
+    {
+        isDashing = true;
+        rb.AddForce(playerDirection * dashForce, ForceMode.VelocityChange);
+        Invoke(nameof(StopDash), dashDuration);
+    }
+    private void StopDash()
+    {
+        isDashing = false;
+        rb.velocity = Vector3.zero;
+        dashTimer = 0;
+    }
+}
