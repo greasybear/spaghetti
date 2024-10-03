@@ -1,0 +1,166 @@
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine.InputSystem;
+using UnityEngine;
+
+public class PlayerShooting : Shooting
+{
+    Ray shootRay = new Ray();
+    public GameObject gunZone;
+    public LineRenderer aimingLine;
+
+    Vector3 begin;
+    Vector3 end;
+    public float aimRadius = 90f;
+    float gunZoneTimer;
+    public float zoneSpeed;
+    public bool aiming;
+    public TrailRenderer trail;
+    public int destroyLayer;
+
+    public bool frozen = false;
+    public AudioClip gunShot;
+    public AudioClip shotGunSound;
+    public AudioClip bossDeathSFX;
+    public AudioClip standardDeath;
+    public AudioClip noAmmoSound;
+    public bool usedFanning = false;
+    public GameObject fanningMaker;
+    public GameObject mainCam;
+    CameraShader camShader;
+    public static bool gotShotgun = false;
+    public static bool gotFan = false;
+
+    protected override void Start()
+    {
+        mainCam = GameObject.FindGameObjectWithTag("MainCamera");
+        camShader = mainCam.GetComponent<CameraShader>();
+        base.Start();
+        aimingLine = gunZone.GetComponent<LineRenderer>();
+        aimingLine.enabled = false;
+        destroyLayer = LayerMask.GetMask("Destroy");
+    }
+    public void bossDeath()
+    {
+        soundSource.PlayOneShot(bossDeathSFX);
+    }
+    private void Update()
+    {
+        { if (gameObject !=null)
+
+        if (!frozen)
+        {
+            if (Gamepad.current != null)
+            {
+                if (Gamepad.current.rightTrigger.wasPressedThisFrame && !firing && bullets > 0)
+                {
+                    soundSource.PlayOneShot(gunShot);
+                    firing = true;
+                    Shoot();
+                    bullets -= 1;
+                    Ammo(1);
+                }
+                else if (Gamepad.current.rightTrigger.wasPressedThisFrame && !firing && bullets == 0)
+                {
+                    soundSource.PlayOneShot(noAmmoSound);
+                }
+            }
+
+            if (Gamepad.current.rightTrigger.wasReleasedThisFrame)
+            {
+                firing = false;
+            }
+
+            if (Gamepad.current.rightShoulder.wasPressedThisFrame && bullets >= 3 && shotgunLine != null && gotShotgun)
+            {
+                soundSource.PlayOneShot(shotGunSound);
+                Shotgun("Enemy");
+                bullets -= 3;
+                Ammo(3);
+            }
+            else if (Gamepad.current.rightShoulder.wasPressedThisFrame && bullets < 3)
+            {
+                soundSource.PlayOneShot(noAmmoSound);
+            }
+
+            if (Gamepad.current.rightShoulder.wasReleasedThisFrame || shotGunTimer > 1f && shotgunLine != null)
+            {
+                shotgunLine.enabled = false;
+                shotGunTimer = 0;
+            }
+
+            if (Gamepad.current.rightShoulder.isPressed)
+            {
+                shotGunTimer += Time.deltaTime;
+            }
+
+            if (shotGunTimer > .2f)
+            {
+                shotgunLine.enabled = false;
+            }
+        }
+
+        gunZoneTimer += Time.deltaTime;
+
+        if (Gamepad.current.yButton.wasPressedThisFrame && !aiming && bullets > 0 && !usedFanning && aimingLine != null && gotFan)
+        {
+            camShader.enabled = true;
+            gunZone.SetActive(true);
+            aimingLine.enabled = true;
+            trail.enabled = true;
+            gunZoneTimer = 0;
+            aiming = true;
+            begin = new Vector3(gunZone.transform.eulerAngles.x, gunZone.transform.eulerAngles.y, gunZone.transform.eulerAngles.z);
+            end = new Vector3(gunZone.transform.eulerAngles.x, gunZone.transform.eulerAngles.y + aimRadius, gunZone.transform.eulerAngles.z);
+            frozen = true;
+            usedFanning = true;
+            fanningMaker.SetActive(false);
+        }
+        else if (Gamepad.current.rightTrigger.wasPressedThisFrame && aiming && bullets > 0 && aimingLine != null)
+        {
+            ParticleSystem Flash = Instantiate(muzzleFlash, firePoint.position, firePoint.rotation);
+            shootRay.origin = gunZone.transform.position;
+            shootRay.direction = gunZone.transform.forward;
+            aimingLine.startColor = Color.yellow;
+            aimingLine.endColor = Color.yellow;
+            RaycastHit shootHit;
+            bullets -= 1;
+            soundSource.PlayOneShot(gunShot);
+            Ammo(1);
+
+            if (Physics.Raycast(shootRay, out shootHit, aimingLine.bounds.size.magnitude, destroyLayer))
+            {
+                Debug.Log("RAYCAST HIT");
+                Destroy(shootHit.collider.gameObject);
+            }
+            else if (Gamepad.current.rightTrigger.wasPressedThisFrame && aiming && bullets == 0)
+            {
+                soundSource.PlayOneShot(noAmmoSound);
+            }
+        }
+        else if (Gamepad.current.rightTrigger.wasReleasedThisFrame && aiming && bullets > 0 && aimingLine != null)
+        {
+            aimingLine.startColor = Color.red;
+            aimingLine.endColor = Color.red;
+        }
+
+        if (aiming && aimingLine != null)
+        {
+            gunZone.transform.eulerAngles = new Vector3(gunZone.transform.rotation.x,
+                Mathf.Lerp(begin.y, end.y, gunZoneTimer * zoneSpeed),
+                gunZone.transform.rotation.z);
+        }
+
+        if (gunZoneTimer > 1 / zoneSpeed && frozen && aimingLine != null)
+        {
+            aiming = false;
+            aimingLine.enabled = false;
+            trail.enabled = false;
+            gunZone.transform.eulerAngles = new Vector3(gunZone.transform.eulerAngles.x, gameObject.transform.eulerAngles.y - (aimRadius / 2), gunZone.transform.eulerAngles.z);
+            frozen = false;
+            camShader.enabled = false;
+        }
+    }
+  }
+}
